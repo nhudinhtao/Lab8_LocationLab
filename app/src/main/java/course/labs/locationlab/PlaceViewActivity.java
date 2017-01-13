@@ -7,6 +7,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -48,8 +49,11 @@ public class PlaceViewActivity extends ListActivity implements LocationListener 
 
 		// TODO - add a footerView to the ListView
 		// You can use footer_view.xml to define the footer
+        placesListView.setFooterDividersEnabled(true);
 
-        View footerView = null;
+        LayoutInflater inflater = (LayoutInflater) getApplicationContext().getSystemService(LAYOUT_INFLATER_SERVICE);
+
+        View footerView = inflater.inflate(R.layout.footer_view, null);
 
 		// TODO - footerView must respond to user clicks, handling 3 cases:
 
@@ -72,23 +76,33 @@ public class PlaceViewActivity extends ListActivity implements LocationListener 
 			@Override
 			public void onClick(View arg0) {
 
+                if (mLocationManager != null) {
+                    Log.d(TAG, "manager not null");
+                    mLastLocationReading = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                    if (mLastLocationReading == null)
+                        Log.d(TAG, "lastlocation null");
+                }
 
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
+                if (mLastLocationReading != null) {
+                    onLocationChanged(mLastLocationReading);
+
+                    if (mAdapter.intersects(mLastLocationReading)) {
+                        Log.d(TAG, "You already have this location badge");
+
+                        Toast.makeText(PlaceViewActivity.this,
+                                "You already have this location badge",
+                                Toast.LENGTH_LONG).show();
+
+                    } else {
+                        Log.d(TAG, "Starting Place Download");
+                        new PlaceDownloaderTask(PlaceViewActivity.this, true).execute(mLastLocationReading);
+                        //addNewPlace(new PlaceRecord(mLastLocationReading));
+                    }
+                } else {
+                    Log.d(TAG, "Location data is not available");
+
+                }
+
 			}
 
 		});
@@ -107,14 +121,15 @@ public class PlaceViewActivity extends ListActivity implements LocationListener 
 
 		// TODO - Check NETWORK_PROVIDER for an existing location reading.
 		// Only keep this last reading if it is fresh - less than 5 minutes old
-
-
-        
-        
-        mLastLocationReading = null;
-
+        if(mLastLocationReading != null && age(mLastLocationReading) < FIVE_MINS){
+            mLastLocationReading = new Location(mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER));
+        }
 
 		// TODO - register to receive location updates from NETWORK_PROVIDER
+        if (mLocationManager != null) {
+            Log.d(TAG, "request");
+            mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, mMinTime, mMinDistance, this);
+        }
 
 
         
@@ -125,6 +140,7 @@ public class PlaceViewActivity extends ListActivity implements LocationListener 
 	protected void onPause() {
 
 		// TODO - unregister for location updates
+        mLocationManager.removeUpdates(this);
 
         
         
@@ -151,6 +167,7 @@ public class PlaceViewActivity extends ListActivity implements LocationListener 
 		// Do not add the PlaceBadge to the adapter
 		
 		// Otherwise - add the PlaceBadge to the adapter
+        mAdapter.add(place);
 		
 
         
@@ -183,14 +200,24 @@ public class PlaceViewActivity extends ListActivity implements LocationListener 
 		// 3) If the current location is newer than the last locations, keep the
 		// current location.
 
-        
-        
-        
-        
-        
-        
-			mLastLocationReading = null;
+
+
+
+
+
+
+        if (mLastLocationReading == null) {
+            mLastLocationReading = currentLocation;
+        }
+
+        if ((currentLocation != null) && (age(currentLocation) > age(mLastLocationReading))) {
+            mLastLocationReading = currentLocation;
+        }
 	}
+
+    private long age(Location location) {
+        return System.currentTimeMillis() - location.getTime();
+    }
 
 	@Override
 	public void onProviderDisabled(String provider) {
